@@ -9,7 +9,7 @@ import (
 
 type SpongeHandler struct {
 	TickTime             time.Duration
-	TickCount            int
+	TickCount            int64
 	Proxy                SpongeProxy
 	CacheExtraExpiration time.Duration
 	CacheRunExpiration   time.Duration
@@ -46,9 +46,11 @@ func (sh *SpongeHandler) Init(cache map[string]SpongeProxyResult) {
 }
 
 func (sh *SpongeHandler) do_cache_expiry() {
+	expiration_time := sh.CacheExtraExpiration + (time.Duration(sh.TickCount * int64(sh.TickTime)))
+
 	for {
 		for key, value := range sh.cache_expire {
-			if value.Add(-sh.CacheExtraExpiration).Before(time.Now().Add(sh.CacheExtraExpiration + (time.Duration(sh.TickCount * int(sh.TickTime))))) {
+			if time.Now().Add(-expiration_time).After(value.Add(sh.CacheExtraExpiration)) {
 				delete(sh.cache_expire, key)
 				delete(sh.cache, key)
 			}
@@ -61,7 +63,7 @@ func (sh *SpongeHandler) do_cache_expiry() {
 func (sh *SpongeHandler) check_tick(key string, request *http.Request) {
 	tick := time.NewTicker(sh.TickTime)
 
-	for tick_count := 0; tick_count < sh.TickCount; tick_count++ {
+	for tick_count := 0; int64(tick_count) < sh.TickCount; tick_count++ {
 		<-tick.C
 
 		result, err := sh.Proxy.MakeBackendRequest(request)
