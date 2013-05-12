@@ -24,13 +24,13 @@ type SpongeProxyResult interface {
 }
 
 type SpongeProxyWriter interface {
-	WriteToHTTP(w *http.ResponseWriter) error
+	WriteToHTTP(w http.ResponseWriter) error
 }
 
 type SpongeProxy interface {
 	MakeCacheKey(request *http.Request) (key string)
 	MakeBackendRequest(request *http.Request) (result SpongeProxyResult, err error)
-	HandleError(err error, writer *http.ResponseWriter)
+	HandleError(err error, writer http.ResponseWriter)
 }
 
 func (sh *SpongeHandler) Init(cache map[string]SpongeProxyResult) {
