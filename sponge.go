@@ -92,7 +92,7 @@ func (sh *SpongeHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 	if !ok {
 		result, err := sh.Proxy.MakeBackendRequest(request)
 
-		if err == nil {
+		if err != nil {
 			sh.Proxy.HandleError(err, writer)
 			sh.mutex.Unlock()
 			return
