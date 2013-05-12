@@ -40,6 +40,8 @@ func (sh *SpongeHandler) Init(cache map[string]SpongeProxyResult) {
 		sh.cache = cache
 	}
 
+	sh.cache_expire = make(map[string]time.Time)
+
 	go sh.do_cache_expiry()
 }
 
