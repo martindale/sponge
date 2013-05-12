@@ -3,7 +3,6 @@ package sponge
 import (
 	"log"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 )
