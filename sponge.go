@@ -11,7 +11,6 @@ import (
 type SpongeHandler struct {
 	TickTime             time.Duration
 	TickCount            int
-	BackendURL           url.URL
 	Proxy                SpongeProxy
 	CacheExtraExpiration time.Duration
 	CacheRunExpiration   time.Duration
@@ -30,8 +29,6 @@ type SpongeProxyWriter interface {
 }
 
 type SpongeProxy interface {
-	http.Handler
-
 	MakeCacheKey(request *http.Request) (key string)
 	MakeBackendRequest(request *http.Request) (result SpongeProxyResult, err error)
 	HandleError(err error, writer *http.ResponseWriter)
