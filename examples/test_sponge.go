@@ -62,6 +62,10 @@ func (result MyResult) WriteToHTTP(writer http.ResponseWriter) error {
 	return nil
 }
 
+func (result MyResult) Equal(other sponge.SpongeProxyResult) bool {
+	return result == other
+}
+
 func main() {
 	sh := &sponge.SpongeHandler{
 		TickTime:             1 * time.Second,

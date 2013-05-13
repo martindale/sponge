@@ -21,6 +21,7 @@ type SpongeHandler struct {
 
 type SpongeProxyResult interface {
 	SpongeProxyWriter
+	Equal(other SpongeProxyResult) bool
 }
 
 type SpongeProxyWriter interface {
@@ -73,7 +74,7 @@ func (sh *SpongeHandler) check_tick(key string, request *http.Request) {
 			continue
 		}
 
-		if sh.cache[key] != result {
+		if !sh.cache[key].Equal(result) {
 			sh.SetCache(request, result)
 			tick.Stop()
 			return
