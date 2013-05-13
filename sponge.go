@@ -183,11 +183,11 @@ func (sh *SpongeHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 			sh.Proxy.HandleError(err, writer)
 			sh.mutex.Unlock()
 			return
-		} else {
-			sh.SetCache(request, result)
-			value, _ = sh.cache[key]
-			go sh.check_tick(key, request)
 		}
+
+		sh.SetCache(request, result)
+		value, _ = sh.cache[key]
+		go sh.check_tick(key, request)
 	}
 
 	sh.mutex.Unlock()
