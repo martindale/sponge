@@ -25,16 +25,54 @@ import (
 	"time"
 )
 
-type SpongeHandler struct {
-	TickTime             time.Duration
-	TickCount            int64
-	Proxy                SpongeProxy
-	CacheExtraExpiration time.Duration
-	CacheRunExpiration   time.Duration
+/*
+This is intended to be consumed by http.Server and similar tooling.
 
-	cache        map[string]SpongeProxyResult
-	cache_expire map[string]time.Time
-	mutex        sync.Mutex
+Example:
+
+    func main() {
+        sh := &sponge.SpongeHandler{
+            TickTime:             1 * time.Second,
+            TickCount:            10,
+            Proxy:                MyProxy{},
+            CacheExtraExpiration: 0 * time.Second,
+            CacheRunExpiration:   1 * time.Second,
+        }
+
+        sh.Init(nil)
+
+        s := &http.Server{
+            Addr:           ":8081",
+            Handler:        sh,
+            ReadTimeout:    10 * time.Second,
+            WriteTimeout:   10 * time.Second,
+            MaxHeaderBytes: 2048,
+        }
+
+        s.ListenAndServe()
+    }
+*/
+type SpongeHandler struct {
+	// Time between each check against the backend.
+	TickTime time.Duration
+
+	// Number of times to check the backend before stopping the background
+	// checking.
+	TickCount int64
+
+	// An object that implements SpongeProxy.
+	Proxy SpongeProxy
+
+	// Cache Expiration is determined by:
+	// (TickTime * TickCount) + CacheExtraExpiration
+	CacheExtraExpiration time.Duration
+
+	// How frequently to check the cache.
+	CacheRunExpiration time.Duration
+
+	cache        map[string]SpongeProxyResult // The actual cache
+	cache_expire map[string]time.Time         // expire management
+	mutex        sync.Mutex                   // mutex for first-hit synchronization
 }
 
 type SpongeProxyResult interface {
