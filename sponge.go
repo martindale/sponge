@@ -75,18 +75,44 @@ type SpongeHandler struct {
 	mutex        sync.Mutex                   // mutex for first-hit synchronization
 }
 
+/*
+This is a result interface that you implement, and corresponds to the kind of
+results you'll see both from the backend and send to the requesting clients.
+
+Examples of this in use are in examples/test_sponge.go.
+*/
 type SpongeProxyResult interface {
 	SpongeProxyWriter
+	// Is the receiver equal to this other object? Used in determining whether
+	// to update the cache.
 	Equal(other SpongeProxyResult) bool
 }
 
+/*
+SpongeProxyWriter is just a composable interface for writing to http objects.
+*/
 type SpongeProxyWriter interface {
+	// Write this response to a http.ResponseWriter.
 	WriteToHTTP(w http.ResponseWriter) error
 }
 
+/*
+SpongeProxy is the proxy logic itself, you implement this and assign it to a
+SpongeHandler's Proxy member. It contains methods you implement for handling
+cache lookups, errors, and making backend requests.
+
+Examples of this in use are in examples/test_sponge.go.
+*/
 type SpongeProxy interface {
+	// Make a cache key which coordinates with the SpongeProxyResult objects.
 	MakeCacheKey(request *http.Request) (key string)
+	// Make a backend request. The original request will be passed in to assist
+	// with any forwarding that needs to be done to the backend, or in the
+	// other direction, errors.
 	MakeBackendRequest(request *http.Request) (result SpongeProxyResult, err error)
+	// If an error is encountered while making the backend request, this method
+	// will be called. The ResponseWriter is passed in so you can do things
+	// like return a 500 status code, etc.
 	HandleError(err error, writer http.ResponseWriter)
 }
 
