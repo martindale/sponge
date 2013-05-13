@@ -116,6 +116,11 @@ type SpongeProxy interface {
 	HandleError(err error, writer http.ResponseWriter)
 }
 
+/*
+Initialize a SpongeHandler. If the argument is nil, it will create the map it
+needs for the cache. Otherwise, you can pass another cache in (for it to share,
+or to restore a cache) and it will be used.
+*/
 func (sh *SpongeHandler) Init(cache map[string]SpongeProxyResult) {
 	if cache == nil {
 		sh.cache = make(map[string]SpongeProxyResult)
@@ -128,6 +133,9 @@ func (sh *SpongeHandler) Init(cache map[string]SpongeProxyResult) {
 	go sh.do_cache_expiry()
 }
 
+/*
+Run the cache expriation -- runs as a goroutine, similar to a Monitor.
+*/
 func (sh *SpongeHandler) do_cache_expiry() {
 	expiration_time := sh.CacheExtraExpiration + (time.Duration(sh.TickCount * int64(sh.TickTime)))
 
@@ -143,6 +151,10 @@ func (sh *SpongeHandler) do_cache_expiry() {
 	}
 }
 
+/*
+This periodically hits the backend until something changes, or the number of
+ticks has exhausted.
+*/
 func (sh *SpongeHandler) check_tick(key string, request *http.Request) {
 	tick := time.NewTicker(sh.TickTime)
 
@@ -164,12 +176,18 @@ func (sh *SpongeHandler) check_tick(key string, request *http.Request) {
 	}
 }
 
+/*
+Function to update the cache and expiration at the same time.
+*/
 func (sh *SpongeHandler) SetCache(request *http.Request, value SpongeProxyResult) {
 	key := sh.Proxy.MakeCacheKey(request)
 	sh.cache[key] = value
 	sh.cache_expire[key] = time.Now()
 }
 
+/*
+http.Server handler -- actually responds to the request.
+*/
 func (sh *SpongeHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	key := sh.Proxy.MakeCacheKey(request)
 
