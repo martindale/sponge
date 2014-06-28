@@ -1,2 +1,4 @@
 examples/src
-examples/pkg
+examples/gopath
+examples/server
+examples/test_sponge

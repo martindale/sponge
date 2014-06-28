@@ -72,7 +72,8 @@ type SpongeHandler struct {
 
 	cache        map[string]SpongeProxyResult // The actual cache
 	cache_expire map[string]time.Time         // expire management
-	mutex        sync.Mutex                   // mutex for first-hit synchronization
+	mutex        sync.Mutex
+	serveMutex   sync.Mutex
 }
 
 /*
@@ -140,12 +141,14 @@ func (sh *SpongeHandler) do_cache_expiry() {
 	expiration_time := sh.CacheExtraExpiration + (time.Duration(sh.TickCount * int64(sh.TickTime)))
 
 	for {
+		sh.mutex.Lock()
 		for key, value := range sh.cache_expire {
 			if time.Now().Add(-expiration_time).After(value.Add(sh.CacheExtraExpiration)) {
 				delete(sh.cache_expire, key)
 				delete(sh.cache, key)
 			}
 		}
+		sh.mutex.Unlock()
 
 		time.Sleep(sh.CacheRunExpiration)
 	}
@@ -155,31 +158,58 @@ func (sh *SpongeHandler) do_cache_expiry() {
 This periodically hits the backend until something changes, or the number of
 ticks has exhausted.
 */
-func (sh *SpongeHandler) check_tick(key string, request *http.Request) {
-	tick := time.NewTicker(sh.TickTime)
+func (sh *SpongeHandler) check_tick(key string, request *http.Request) (SpongeProxyResult, error) {
 
-	for tick_count := 0; int64(tick_count) < sh.TickCount; tick_count++ {
-		<-tick.C
+	sp := make(chan []interface{})
 
-		result, err := sh.Proxy.MakeBackendRequest(request)
+	go func() {
+		for i := int64(0); i < sh.TickCount; i++ {
+			result, err := sh.Proxy.MakeBackendRequest(request)
 
-		if err != nil {
-			log.Println("error:", err)
-			continue
+			if val, ok := sh.GetCache(key); !ok || !val.Equal(result) {
+
+				if err != nil {
+					log.Println("error:", err)
+					continue
+				}
+
+				sh.SetCache(request, result)
+			}
+
+			if sp != nil {
+				sp <- []interface{}{result, err}
+				sp = nil
+			}
+
+			time.Sleep(sh.TickTime)
 		}
+	}()
 
-		if !sh.cache[key].Equal(result) {
-			sh.SetCache(request, result)
-			tick.Stop()
-			return
-		}
+	res := <-sp
+
+	switch res[1].(type) {
+	case error:
+		return res[0].(SpongeProxyResult), res[1].(error)
+	case nil:
+		return res[0].(SpongeProxyResult), nil
 	}
+
+	return nil, nil
+}
+
+func (sh *SpongeHandler) GetCache(key string) (SpongeProxyResult, bool) {
+	sh.mutex.Lock()
+	defer sh.mutex.Unlock()
+	value, ok := sh.cache[key]
+	return value, ok
 }
 
 /*
 Function to update the cache and expiration at the same time.
 */
 func (sh *SpongeHandler) SetCache(request *http.Request, value SpongeProxyResult) {
+	sh.mutex.Lock()
+	defer sh.mutex.Unlock()
 	key := sh.Proxy.MakeCacheKey(request)
 	sh.cache[key] = value
 	sh.cache_expire[key] = time.Now()
@@ -189,25 +219,14 @@ func (sh *SpongeHandler) SetCache(request *http.Request, value SpongeProxyResult
 http.Server handler -- actually responds to the request.
 */
 func (sh *SpongeHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	sh.serveMutex.Lock()
+	defer sh.serveMutex.Unlock()
 	key := sh.Proxy.MakeCacheKey(request)
 
-	sh.mutex.Lock()
-	value, ok := sh.cache[key]
-
+	result, ok := sh.GetCache(key)
 	if !ok {
-		result, err := sh.Proxy.MakeBackendRequest(request)
-
-		if err != nil {
-			sh.Proxy.HandleError(err, writer)
-			sh.mutex.Unlock()
-			return
-		}
-
-		sh.SetCache(request, result)
-		value, _ = sh.cache[key]
-		go sh.check_tick(key, request)
+		result, _ = sh.check_tick(key, request)
 	}
 
-	sh.mutex.Unlock()
-	value.WriteToHTTP(writer)
+	result.WriteToHTTP(writer)
 }

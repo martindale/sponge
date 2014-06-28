@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	sponge "github.com/erikh/sponge"
+	"github.com/erikh/sponge"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -63,15 +63,15 @@ func (result MyResult) WriteToHTTP(writer http.ResponseWriter) error {
 }
 
 func (result MyResult) Equal(other sponge.SpongeProxyResult) bool {
-	return result == other
+	return result.Result == other.(MyResult).Result
 }
 
 func main() {
 	sh := &sponge.SpongeHandler{
 		TickTime:             1 * time.Second,
-		TickCount:            10,
+		TickCount:            1,
 		Proxy:                MyProxy{},
-		CacheExtraExpiration: 0 * time.Second,
+		CacheExtraExpiration: 0,
 		CacheRunExpiration:   1 * time.Second,
 	}
 
