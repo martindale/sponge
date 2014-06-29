@@ -70,10 +70,10 @@ type SpongeHandler struct {
 	// How frequently to check the cache.
 	CacheRunExpiration time.Duration
 
-	cache        map[string]SpongeProxyResult // The actual cache
-	cache_expire map[string]time.Time         // expire management
-	mutex        sync.Mutex
-	serveMutex   sync.Mutex
+	cache       map[string]SpongeProxyResult // The actual cache
+	cacheExpire map[string]time.Time         // expire management
+	mutex       sync.Mutex
+	serveMutex  sync.Mutex
 }
 
 /*
@@ -134,22 +134,22 @@ func (sh *SpongeHandler) Init(cache map[string]SpongeProxyResult) {
 		sh.cache = cache
 	}
 
-	sh.cache_expire = make(map[string]time.Time)
+	sh.cacheExpire = make(map[string]time.Time)
 
-	go sh.do_cache_expiry()
+	go sh.doCacheExpiry()
 }
 
 /*
 Run the cache expriation -- runs as a goroutine, similar to a Monitor.
 */
-func (sh *SpongeHandler) do_cache_expiry() {
+func (sh *SpongeHandler) doCacheExpiry() {
 	expiration_time := sh.CacheExtraExpiration + (time.Duration(sh.TickCount * int64(sh.TickTime)))
 
 	for {
 		sh.mutex.Lock()
-		for key, value := range sh.cache_expire {
+		for key, value := range sh.cacheExpire {
 			if time.Now().Add(-expiration_time).After(value.Add(sh.CacheExtraExpiration)) {
-				delete(sh.cache_expire, key)
+				delete(sh.cacheExpire, key)
 				delete(sh.cache, key)
 			}
 		}
@@ -163,7 +163,7 @@ func (sh *SpongeHandler) do_cache_expiry() {
 This periodically hits the backend until something changes, or the number of
 ticks has exhausted.
 */
-func (sh *SpongeHandler) check_tick(key string, request *http.Request) (SpongeProxyResult, error) {
+func (sh *SpongeHandler) checkTick(key string, request *http.Request) (SpongeProxyResult, error) {
 
 	sp := make(chan tickChan)
 
@@ -210,7 +210,7 @@ func (sh *SpongeHandler) SetCache(request *http.Request, value SpongeProxyResult
 	defer sh.mutex.Unlock()
 	key := sh.Proxy.MakeCacheKey(request)
 	sh.cache[key] = value
-	sh.cache_expire[key] = time.Now()
+	sh.cacheExpire[key] = time.Now()
 }
 
 /*
@@ -223,7 +223,7 @@ func (sh *SpongeHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 
 	result, ok := sh.GetCache(key)
 	if !ok {
-		result, _ = sh.check_tick(key, request)
+		result, _ = sh.checkTick(key, request)
 	}
 
 	result.WriteToHTTP(writer)
