@@ -117,6 +117,11 @@ type SpongeProxy interface {
 	HandleError(err error, writer http.ResponseWriter)
 }
 
+type tickChan struct {
+	result SpongeProxyResult
+	err    error
+}
+
 /*
 Initialize a SpongeHandler. If the argument is nil, it will create the map it
 needs for the cache. Otherwise, you can pass another cache in (for it to share,
@@ -160,7 +165,7 @@ ticks has exhausted.
 */
 func (sh *SpongeHandler) check_tick(key string, request *http.Request) (SpongeProxyResult, error) {
 
-	sp := make(chan []interface{})
+	sp := make(chan tickChan)
 
 	go func() {
 		for i := int64(0); i < sh.TickCount; i++ {
@@ -177,7 +182,7 @@ func (sh *SpongeHandler) check_tick(key string, request *http.Request) (SpongePr
 			}
 
 			if sp != nil {
-				sp <- []interface{}{result, err}
+				sp <- tickChan{result, err}
 				sp = nil
 			}
 
@@ -187,14 +192,7 @@ func (sh *SpongeHandler) check_tick(key string, request *http.Request) (SpongePr
 
 	res := <-sp
 
-	switch res[1].(type) {
-	case error:
-		return res[0].(SpongeProxyResult), res[1].(error)
-	case nil:
-		return res[0].(SpongeProxyResult), nil
-	}
-
-	return nil, nil
+	return res.result, res.err
 }
 
 func (sh *SpongeHandler) GetCache(key string) (SpongeProxyResult, bool) {
